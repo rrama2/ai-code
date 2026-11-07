@@ -1,0 +1,9 @@
+metric,baseline,final
+Total queries,20,20
+Correct answer matches,6,12
+Correct escalations,8,8
+Escalations,14,8
+Errors,0,0
+Automated resolution proxy (%),30,60
+Escalation rate (%),70,40
+Answer accuracy proxy (%),100,100
