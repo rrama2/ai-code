@@ -1,0 +1,21 @@
+// Reconstructed from user-supplied Confidence Check and confirmed incremental changes.
+const input = $input.first().json;
+const results = input.hybrid_results || [];
+const best = results[0];
+const query = String(input.query || '').trim();
+const customerId = input.customer_id || 'anonymous';
+const normalize = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+const exactMatch = best && normalize(query) === normalize(best.question);
+const bothMethods = best && (best.matched_by || []).includes('keyword') && (best.matched_by || []).includes('semantic');
+const keywordScore = Number(best?.keyword_score || 0);
+const hasEvidence = Boolean(best?.id && best?.answer?.trim());
+const sensitive = /refund|delete (my|our|account|data)|restore|cancel (my|our)|increase.*limit|chargeback|legal|security breach/i.test(query);
+const passwordResetParaphrase = best?.id === 'FAQ001' && /forgot|reset|lost/i.test(query) && /password|login credentials/i.test(query) && hasEvidence;
+const twoFactorParaphrase = best?.id === 'FAQ002' && hasEvidence && (/\b2fa\b/i.test(query) || /\btwo[\s-]factor authentication\b/i.test(query)) && /\b(enable|turn on|activate|set up)\b/i.test(query);
+const billingParaphrase = best?.id === 'FAQ003' && hasEvidence && /\b(where|how)\b/i.test(query) && /\b(change|update|edit|modify)\b/i.test(query) && /\b(payment|billing)\b/i.test(query) && /\b(details|information|info|method)\b/i.test(query) && !/\b(refund|chargeback|dispute|charged|cancel|delete|remove|make the change|do it for me)\b/i.test(query);
+const apiKeyParaphrase = best?.id === 'MAN001' && hasEvidence && /\b(where|how)\b/i.test(query) && /\b(create|generate|make|set up)\b/i.test(query) && /\b(api[\s-]?(key|token)|developer[\s-]?(key|token))\b/i.test(query) && !/\b(show|reveal|retrieve|display|share|expose|steal|someone else's|another user's|existing|current|secret)\b/i.test(query);
+const dataExportParaphrase = best?.id === 'MAN002' && hasEvidence && /\b(my|our)\b/i.test(query) && /\b(data|information)\b/i.test(query) && /\b(download|export)\b/i.test(query) && !/\b(someone else|another user|other users|all users|delete|erase|remove|send to|share with)\b/i.test(query);
+const resetEmailParaphrase = best?.id === 'TKT001' && hasEvidence && /\b(password|reset)\b/i.test(query) && /\b(email|mail|link)\b/i.test(query) && /\b(never arrived|not received|didn't receive|did not receive|not getting|missing|hasn't arrived)\b/i.test(query);
+const sufficientEvidence = Boolean(hasEvidence && !sensitive && (exactMatch || (bothMethods && keywordScore >= 0.75) || passwordResetParaphrase || twoFactorParaphrase || billingParaphrase || apiKeyParaphrase || dataExportParaphrase || resetEmailParaphrase));
+const confidence = !hasEvidence ? 0 : sensitive ? 0.1 : exactMatch ? 0.95 : bothMethods && keywordScore >= 0.75 ? 0.85 : passwordResetParaphrase || twoFactorParaphrase || billingParaphrase || apiKeyParaphrase || dataExportParaphrase || resetEmailParaphrase ? 0.8 : bothMethods ? 0.55 : 0.3;
+return [{json:{status:sufficientEvidence ? 'answered' : 'escalated', query, customer_id:customerId, confidence, answer:sufficientEvidence ? best.answer : null, source:sufficientEvidence ? {id:best.id, type:best.source} : null, escalation:sufficientEvidence ? null : {reason:sensitive ? 'Sensitive request requiring review' : !hasEvidence ? 'Insufficient supporting evidence' : 'Confidence below threshold', state:'pending_human_review', ticket_id:null}, message:sufficientEvidence ? best.answer : "I can't verify an answer confidently. This request needs review by a support agent."}}];
