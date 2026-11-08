@@ -1,0 +1,40 @@
+{
+  "sample_id": "user_service",
+  "status": "CHANGES_REQUIRED",
+  "summary": {
+    "critical": 1,
+    "high": 0,
+    "medium": 2,
+    "low": 0,
+    "total": 3
+  },
+  "findings": [
+    {
+      "agent": "Security Analysis",
+      "rule": "SEC-SQL-INJECTION",
+      "severity": "CRITICAL",
+      "line": 2,
+      "title": "Potential SQL injection",
+      "recommendation": "Use parameterized queries and bind untrusted values as parameters."
+    },
+    {
+      "agent": "Test Coverage",
+      "rule": "TEST-NONE",
+      "severity": "MEDIUM",
+      "title": "No tests provided",
+      "recommendation": "Add unit tests for normal, error, and boundary cases."
+    },
+    {
+      "agent": "Test Coverage",
+      "rule": "TEST-SQL",
+      "severity": "MEDIUM",
+      "title": "Missing SQL input safety test",
+      "recommendation": "Test unusual and untrusted query parameters with a temporary database."
+    }
+  ],
+  "debug": {
+    "received_items": 3,
+    "findings_collected": 3,
+    "findings_after_deduplication": 3
+  }
+}
