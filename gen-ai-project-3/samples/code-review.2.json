@@ -1,0 +1,5 @@
+{
+  "sample_id": "backup_utility",
+  "code": "import subprocess\nimport pickle\n\ndef run_backup(path):\n    subprocess.run(\"tar -czf backup.tar.gz \" + path, shell=True)\n\ndef load_backup(data):\n    return pickle.loads(data)\n\ndef evaluate_config(expression):\n    return eval(expression)",
+  "tests": ""
+}
