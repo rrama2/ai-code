@@ -1,0 +1,54 @@
+{
+  "sample_id": "backup_utility",
+  "status": "CHANGES_REQUIRED",
+  "summary": {
+    "critical": 1,
+    "high": 1,
+    "medium": 1,
+    "low": 0,
+    "total": 3
+  },
+  "findings": [
+    {
+      "agent": "security",
+      "rule": "SEC-EVAL",
+      "severity": "CRITICAL",
+      "line": 11,
+      "title": "Dynamic evaluation of input",
+      "recommendation": "Remove eval/exec and parse expected data types explicitly."
+    },
+    {
+      "agent": "security",
+      "rule": "SEC-SHELL",
+      "severity": "HIGH",
+      "line": 5,
+      "title": "Shell command execution",
+      "recommendation": "Use argument arrays with shell=False and validate inputs."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "No tests provided",
+      "recommendation": "Add unit tests for all functions."
+    }
+  ],
+  "debug": {
+    "received_items": 3,
+    "findings_collected": 3,
+    "input_keys": [
+      [
+        "sample_id",
+        "bug_findings"
+      ],
+      [
+        "sample_id",
+        "agent",
+        "findings"
+      ],
+      [
+        "sample_id",
+        "test_findings"
+      ]
+    ]
+  }
+}
