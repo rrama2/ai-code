@@ -1,0 +1,219 @@
+{
+  "name": "Multi-Agent Code Review — 3 Agents",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "multi-agent-code-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "85aeef08-e58b-4a99-8415-821bbe08a9c4",
+      "name": "Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        224
+      ],
+      "webhookId": "98829886-dbe8-4f02-9ab0-03ce2b2f13ab"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nreturn items.map(item => {\n  const body = item.json.body ?? item.json;\n\n  if (typeof body.sample_id !== \"string\" ||\n      !body.sample_id.trim()) {\n    throw new Error(\"Missing or invalid sample_id\");\n  }\n\n  if (typeof body.code !== \"string\" ||\n      !body.code.trim()) {\n    throw new Error(\"Missing or invalid code\");\n  }\n\n  return {\n    json: {\n      sample_id: body.sample_id,\n      code: body.code,\n      tests: body.tests ?? \"\"\n    }\n  };\n});\n"
+      },
+      "id": "cc61ceef-d734-48c7-8455-cdcca0dd1419",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json;\nconst code = data.code ?? data.body?.code ?? \"\";\nconst findings = [];\n\nif (/discounts\\s*=\\s*\\[\\]/.test(code)) {\n  findings.push({\n    agent: \"Bug Analysis\",\n    severity: \"HIGH\",\n    title: \"Mutable default argument\",\n    recommendation: \"Replace discounts=[] with discounts=None.\"\n  });\n}\n\nif (/return\\s+total\\s*\\/\\s*count/.test(code)) {\n  findings.push({\n    agent: \"Bug Analysis\",\n    severity: \"MEDIUM\",\n    title: \"Potential division by zero\",\n    recommendation: \"Validate count before division.\"\n  });\n}\n\nreturn [{\n  json: {\n    sample_id: data.sample_id,\n    bug_findings: findings\n  }\n}];\n"
+      },
+      "id": "e370ae05-8896-408d-baaf-31b827388317",
+      "name": "Agent 1 — Bugs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json;\nconst code = data.code ?? data.body?.code ?? \"\";\n\nconst src=$json.code||'';\nconst lines=src.split('\\n');\nconst findings=[];\nfunction add(rule,severity,line,title,recommendation){findings.push({agent:'security',rule,severity,line,title,recommendation});}\nlines.forEach((s,i)=>{\n const line=i+1;\n if (/\\bquery\\s*=\\s*f[\"'].*\\b(SELECT|UPDATE|INSERT|DELETE)\\b/i.test(s)) add('SEC-SQL-INJECTION','Critical',line,'Potential SQL injection','Use parameterized queries; never interpolate untrusted values into SQL.');\n if (/\\b(execute|executemany|raw)\\s*\\(\\s*f[\"']/.test(s) || /\\bexecute\\s*\\([^\\n]*(\\+|%\\s*\\(|\\.format\\s*\\()/.test(s)) add('SEC-SQL-INJECTION','Critical',line,'Potential SQL injection','Use parameterized queries; never interpolate untrusted values into SQL.');\n if (/\\b(shell\\s*=\\s*True|os\\.system\\s*\\()/.test(s)) add('SEC-SHELL','High',line,'Shell command execution','Use argument arrays with shell=False and validate inputs.');\n if (/\\b(eval|exec)\\s*\\(/.test(s)) add('SEC-EVAL','Critical',line,'Dynamic evaluation of input','Remove eval/exec and parse expected data types explicitly.');\n if (/\\b(password|api_key|secret|token)\\s*=\\s*[\"'][^\"']{6,}[\"']/.test(s) && !/example|placeholder|dummy/i.test(s)) add('SEC-HARDCODED-SECRET','High',line,'Possible hardcoded credential','Use a secret manager or environment variable; rotate exposed credentials.');\n if (/\\b(open|send_file)\\s*\\(\\s*(filename|filepath|path|user_path)\\b/.test(s)) add('SEC-PATH-TRAVERSAL','High',line,'Unvalidated file path','Constrain resolved paths to an approved base directory.');\n});\n\nif (/SELECT\\b[^\\n]*\\+/.test(code)) {\n  findings.push({\n    agent: \"security\",\n    rule: \"SEC-SQL-INJECTION\",\n    severity: \"CRITICAL\",\n    title: \"Potential SQL injection\",\n    recommendation:\n      \"Use parameterized SQL queries instead of string concatenation.\"\n  });\n}\n\nreturn [{json:{sample_id:$json.sample_id,agent:'security',findings}}];\n"
+      },
+      "id": "f68c2dfc-2a0f-4f79-8d5c-6b1e79447565",
+      "name": "Agent 2 — Security",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json;\nconst code = data.code ?? data.body?.code ?? \"\";\nconst tests = data.tests ?? \"\";\nconst findings = [];\n\nif (!String(tests).trim()) {\n  findings.push({\n    agent: \"Test Coverage\",\n    severity: \"MEDIUM\",\n    title: \"No tests provided\",\n    recommendation: \"Add unit tests for all functions.\"\n  });\n}\n\nif (/discounts\\s*=\\s*\\[\\]/.test(code)) {\n  findings.push({\n    agent: \"Test Coverage\",\n    severity: \"MEDIUM\",\n    title: \"Missing mutable-default test\",\n    recommendation: \"Test repeated function calls.\"\n  });\n}\n\nif (/return\\s+total\\s*\\/\\s*count/.test(code)) {\n  findings.push({\n    agent: \"Test Coverage\",\n    severity: \"MEDIUM\",\n    title: \"Missing zero-divisor test\",\n    recommendation: \"Test count = 0.\"\n  });\n}\n\nreturn [{\n  json: {\n    sample_id: data.sample_id,\n    test_findings: findings\n  }\n}];\n"
+      },
+      "id": "4fac6acd-6a0e-40d1-b43d-17042d32516f",
+      "name": "Agent 3 — Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "4c87c5c9-6d1c-4787-888d-dab756a4a6e9",
+      "name": "Merge Agent Findings",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst findings = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  for (const key of [\n    \"bug_findings\",\n    \"security_findings\",\n    \"test_findings\",\n    \"findings\"\n  ]) {\n    if (Array.isArray(data[key])) {\n      findings.push(...data[key]);\n    }\n  }\n}\n\nconst ranks = {\n  CRITICAL: 4,\n  HIGH: 3,\n  MEDIUM: 2,\n  LOW: 1\n};\n\n\nfor (const finding of findings) {\n  finding.severity = String(\n    finding.severity ?? \"LOW\"\n  ).toUpperCase();\n}\n\nfindings.sort((a, b) =>\n  (ranks[b.severity] ?? 0) -\n  (ranks[a.severity] ?? 0)\n);\n\nconst summary = {\n  critical: findings.filter(f => f.severity === \"CRITICAL\").length,\n  high: findings.filter(f => f.severity === \"HIGH\").length,\n  medium: findings.filter(f => f.severity === \"MEDIUM\").length,\n  low: findings.filter(f => f.severity === \"LOW\").length,\n  total: findings.length\n};\n\nreturn [{\n  json: {\n    sample_id: items[0]?.json.sample_id ?? \"unknown\",\n    status: summary.high || summary.critical\n      ? \"CHANGES_REQUIRED\"\n      : \"REVIEW_COMPLETE\",\n    summary,\n    findings,\n    debug: {\n      received_items: items.length,\n      findings_collected: findings.length,\n      input_keys: items.map(i => Object.keys(i.json))\n    }\n  }\n}];\n"
+      },
+      "id": "a89311cd-793d-4367-ab93-81d9a81c557a",
+      "name": "Orchestrator — Prioritize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "11c9c115-529c-442c-9a98-1a18294a7976",
+      "name": "Return Review JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1280,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Agent 1 — Bugs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent 2 — Security",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent 3 — Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 1 — Bugs": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 — Security": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Agent 3 — Tests": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Agent Findings": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator — Prioritize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator — Prioritize": {
+      "main": [
+        [
+          {
+            "node": "Return Review JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a703c7f1-784e-43d9-ad6c-d7b97da8b371",
+  "meta": {
+    "instanceId": "c345804b86439643673c8c90247a204a8b9bef33a99441617b228212d1586aff"
+  },
+  "nodeGroups": [],
+  "id": "iT1mNmCMYoqsZUbH",
+  "tags": []
+}
