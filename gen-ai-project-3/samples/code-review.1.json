@@ -1,0 +1,5 @@
+{
+  "sample_id": "user_service",
+  "code": "import sqlite3\n\ndef get_user(username):\n    conn = sqlite3.connect('users.db')\n    query = \"SELECT * FROM users WHERE username = '\" + username + \"'\"\n    return conn.execute(query).fetchone()",
+  "tests": ""
+}
