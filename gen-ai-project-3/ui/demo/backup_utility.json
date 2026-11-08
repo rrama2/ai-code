@@ -1,0 +1,46 @@
+{
+  "sample_id": "backup_utility",
+  "status": "CHANGES_REQUIRED",
+  "summary": {
+    "critical": 1,
+    "high": 2,
+    "medium": 2,
+    "low": 0,
+    "total": 5
+  },
+  "findings": [
+    {
+      "agent": "Security Analysis",
+      "severity": "CRITICAL",
+      "title": "Dynamic evaluation of input",
+      "line": 11,
+      "recommendation": "Remove eval/exec and explicitly parse expected data types."
+    },
+    {
+      "agent": "Security Analysis",
+      "severity": "HIGH",
+      "title": "Shell command execution",
+      "line": 5,
+      "recommendation": "Use subprocess argument arrays with shell=False and validate inputs."
+    },
+    {
+      "agent": "Security Analysis",
+      "severity": "HIGH",
+      "title": "Unsafe deserialization risk",
+      "line": 8,
+      "recommendation": "Do not unpickle untrusted data."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "No tests provided",
+      "recommendation": "Add unit tests."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "Missing dangerous-input regression tests",
+      "recommendation": "Test rejection of untrusted input."
+    }
+  ]
+}
