@@ -1,0 +1,45 @@
+{
+  "sample_id": "billing_calculations",
+  "status": "CHANGES_REQUIRED",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 4,
+    "low": 0,
+    "total": 5
+  },
+  "findings": [
+    {
+      "agent": "Bug Analysis",
+      "severity": "HIGH",
+      "title": "Mutable default argument",
+      "line": 1,
+      "recommendation": "Use None and create a new collection inside the function."
+    },
+    {
+      "agent": "Bug Analysis",
+      "severity": "MEDIUM",
+      "title": "Potential division by zero",
+      "line": 8,
+      "recommendation": "Validate the divisor and test zero-count behavior."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "No tests provided",
+      "recommendation": "Add unit tests."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "Missing mutable-default regression test",
+      "recommendation": "Test repeated calls."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "Missing zero-divisor test",
+      "recommendation": "Test zero divisor."
+    }
+  ]
+}
