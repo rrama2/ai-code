@@ -1,0 +1,56 @@
+{
+  "sample_id": "backup_utility",
+  "status": "CHANGES_REQUIRED",
+  "summary": {
+    "critical": 1,
+    "high": 2,
+    "medium": 2,
+    "low": 0,
+    "total": 5
+  },
+  "findings": [
+    {
+      "agent": "Security Analysis",
+      "rule": "SEC-EVAL",
+      "severity": "CRITICAL",
+      "line": 11,
+      "title": "Dynamic evaluation of input",
+      "recommendation": "Remove eval/exec and explicitly parse expected data types."
+    },
+    {
+      "agent": "Security Analysis",
+      "rule": "SEC-SHELL",
+      "severity": "HIGH",
+      "line": 5,
+      "title": "Shell command execution",
+      "recommendation": "Use subprocess argument arrays with shell=False and validate inputs."
+    },
+    {
+      "agent": "Security Analysis",
+      "rule": "SEC-PICKLE",
+      "severity": "HIGH",
+      "line": 8,
+      "title": "Unsafe deserialization risk",
+      "recommendation": "Do not unpickle untrusted data; use a constrained data format such as JSON."
+    },
+    {
+      "agent": "Test Coverage",
+      "rule": "TEST-NONE",
+      "severity": "MEDIUM",
+      "title": "No tests provided",
+      "recommendation": "Add unit tests for normal, error, and boundary cases."
+    },
+    {
+      "agent": "Test Coverage",
+      "rule": "TEST-SECURITY",
+      "severity": "MEDIUM",
+      "title": "Missing dangerous-input regression tests",
+      "recommendation": "Test rejection of untrusted commands, serialized data, and expressions without executing unsafe payloads."
+    }
+  ],
+  "debug": {
+    "received_items": 3,
+    "findings_collected": 5,
+    "findings_after_deduplication": 5
+  }
+}
