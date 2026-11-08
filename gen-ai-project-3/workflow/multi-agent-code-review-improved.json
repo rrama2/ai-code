@@ -1,0 +1,214 @@
+{
+  "name": "Multi-Agent Code Review — Improved Rules",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "multi-agent-code-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "85aeef08-e58b-4a99-8415-821bbe08a9c4",
+      "name": "Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        224
+      ],
+      "webhookId": "98829886-dbe8-4f02-9ab0-03ce2b2f13ab"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nreturn items.map(item => {\n  const body = item.json.body ?? item.json;\n\n  if (typeof body.sample_id !== \"string\" ||\n      !body.sample_id.trim()) {\n    throw new Error(\"Missing or invalid sample_id\");\n  }\n\n  if (typeof body.code !== \"string\" ||\n      !body.code.trim()) {\n    throw new Error(\"Missing or invalid code\");\n  }\n\n  return {\n    json: {\n      sample_id: body.sample_id,\n      code: body.code,\n      tests: body.tests ?? \"\"\n    }\n  };\n});\n"
+      },
+      "id": "cc61ceef-d734-48c7-8455-cdcca0dd1419",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data=$input.first().json,code=data.code??\"\",findings=[];\ncode.split(\"\\n\").forEach((s,i)=>{\nif(/def\\s+\\w+\\([^)]*=\\s*\\[\\]/.test(s))findings.push({agent:\"Bug Analysis\",severity:\"HIGH\",line:i+1,title:\"Mutable default argument\",recommendation:\"Use None as the default.\"});\nif(/return\\s+total\\s*\\/\\s*count/.test(s))findings.push({agent:\"Bug Analysis\",severity:\"MEDIUM\",line:i+1,title:\"Potential division by zero\",recommendation:\"Check count before division.\"});\n});\nreturn [{json:{sample_id:data.sample_id,bug_findings:findings}}];"
+      },
+      "id": "e370ae05-8896-408d-baaf-31b827388317",
+      "name": "Agent 1 — Bugs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data=$input.first().json,code=data.code??data.body?.code??\"\",findings=[];\nfunction add(rule,severity,line,title,recommendation){findings.push({agent:\"security\",rule,severity,line,title,recommendation});}\ncode.split(\"\\n\").forEach((s,i)=>{\nconst line=i+1;\nif(/\\b(SELECT|UPDATE|INSERT|DELETE)\\b/i.test(s)&&(/(\\+|f[\"']|\\.format\\()/.test(s)))add(\"SEC-SQL-INJECTION\",\"CRITICAL\",line,\"Potential SQL injection\",\"Use parameterized queries.\");\nif(/shell\\s*=\\s*True|\\bos\\.system\\s*\\(/.test(s))add(\"SEC-SHELL\",\"HIGH\",line,\"Shell command execution\",\"Use shell=False with argument arrays.\");\nif(/\\bpickle\\.loads?\\s*\\(/.test(s))add(\"SEC-PICKLE\",\"HIGH\",line,\"Unsafe deserialization\",\"Do not deserialize untrusted pickle data.\");\nif(/\\b(eval|exec)\\s*\\(/.test(s))add(\"SEC-EVAL\",\"CRITICAL\",line,\"Dynamic evaluation of input\",\"Avoid eval/exec on untrusted data.\");\n});\nreturn [{json:{sample_id:data.sample_id,agent:\"security\",findings:[...new Map(findings.map(f=>[f.rule+\":\"+f.line,f])).values()]}}];"
+      },
+      "id": "f68c2dfc-2a0f-4f79-8d5c-6b1e79447565",
+      "name": "Agent 2 — Security",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data=$input.first().json,code=data.code??\"\",findings=[];\nfunction add(title,recommendation){findings.push({agent:\"Test Coverage\",severity:\"MEDIUM\",title,recommendation});}\nif(!String(data.tests??\"\").trim())add(\"No tests provided\",\"Add unit tests.\");\nif(/=\\s*\\[\\]/.test(code))add(\"Missing mutable-default test\",\"Test repeated calls.\");\nif(/return\\s+total\\s*\\/\\s*count/.test(code))add(\"Missing zero-divisor test\",\"Test count=0.\");\nif(/\\bSELECT\\b/i.test(code))add(\"Missing SQL input tests\",\"Test parameter handling and invalid inputs.\");\nif(/\\bpickle\\.loads?\\s*\\(/.test(code))add(\"Missing deserialization tests\",\"Test rejection of untrusted data.\");\nreturn [{json:{sample_id:data.sample_id,test_findings:findings}}];"
+      },
+      "id": "4fac6acd-6a0e-40d1-b43d-17042d32516f",
+      "name": "Agent 3 — Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "4c87c5c9-6d1c-4787-888d-dab756a4a6e9",
+      "name": "Merge Agent Findings",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all(),all=[];\nfor(const {json:d} of items)for(const key of [\"bug_findings\",\"security_findings\",\"test_findings\",\"findings\"])if(Array.isArray(d[key]))all.push(...d[key]);\nconst rank={CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1},seen=new Set();\nconst findings=all.map(f=>({...f,severity:String(f.severity??\"LOW\").toUpperCase()})).filter(f=>{const k=[f.agent,f.rule??f.title,f.line??\"\"].join(\"|\");if(seen.has(k))return false;seen.add(k);return true;}).sort((a,b)=>(rank[b.severity]??0)-(rank[a.severity]??0));\nconst summary={critical:0,high:0,medium:0,low:0,total:findings.length};\nfor(const f of findings)if(f.severity.toLowerCase() in summary)summary[f.severity.toLowerCase()]++;\nreturn [{json:{sample_id:items[0]?.json.sample_id??\"unknown\",status:summary.critical||summary.high?\"CHANGES_REQUIRED\":\"REVIEW_COMPLETE\",summary,findings,debug:{received_items:items.length,findings_collected:findings.length}}}];"
+      },
+      "id": "a89311cd-793d-4367-ab93-81d9a81c557a",
+      "name": "Orchestrator — Prioritize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "11c9c115-529c-442c-9a98-1a18294a7976",
+      "name": "Return Review JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1280,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Agent 1 — Bugs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent 2 — Security",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent 3 — Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 1 — Bugs": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 — Security": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Agent 3 — Tests": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Agent Findings": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator — Prioritize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator — Prioritize": {
+      "main": [
+        [
+          {
+            "node": "Return Review JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
