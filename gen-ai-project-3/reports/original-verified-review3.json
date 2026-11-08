@@ -1,0 +1,62 @@
+{
+  "sample_id": "billing_calculations",
+  "status": "CHANGES_REQUIRED",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 4,
+    "low": 0,
+    "total": 5
+  },
+  "findings": [
+    {
+      "agent": "Bug Analysis",
+      "severity": "HIGH",
+      "title": "Mutable default argument",
+      "recommendation": "Replace discounts=[] with discounts=None."
+    },
+    {
+      "agent": "Bug Analysis",
+      "severity": "MEDIUM",
+      "title": "Potential division by zero",
+      "recommendation": "Validate count before division."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "No tests provided",
+      "recommendation": "Add unit tests for all functions."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "Missing mutable-default test",
+      "recommendation": "Test repeated function calls."
+    },
+    {
+      "agent": "Test Coverage",
+      "severity": "MEDIUM",
+      "title": "Missing zero-divisor test",
+      "recommendation": "Test count = 0."
+    }
+  ],
+  "debug": {
+    "received_items": 3,
+    "findings_collected": 5,
+    "input_keys": [
+      [
+        "sample_id",
+        "bug_findings"
+      ],
+      [
+        "sample_id",
+        "agent",
+        "findings"
+      ],
+      [
+        "sample_id",
+        "test_findings"
+      ]
+    ]
+  }
+}
