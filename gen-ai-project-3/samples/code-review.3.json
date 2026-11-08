@@ -1,0 +1,5 @@
+{
+  "sample_id": "billing_calculations",
+  "code": "def calculate_total(items, discounts=[]):\n    total = sum(item[\"price\"] * item[\"quantity\"] for item in items)\n    for discount in discounts:\n        total -= discount\n    return total\n\ndef calculate_average(total, count):\n    return total / count\n\ndef apply_tax(amount, rate):\n    return round(amount * (1 + rate), 2)",
+  "tests": ""
+}
