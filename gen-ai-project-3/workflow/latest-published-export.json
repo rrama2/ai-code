@@ -1,0 +1,221 @@
+{
+  "name": "Multi-Agent Code Review — 3 Agents",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "multi-agent-code-review",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "https://rrama2.github.io"
+        }
+      },
+      "id": "0d5f554f-58c5-41e5-a211-125ac6025c4f",
+      "name": "Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        224
+      ],
+      "webhookId": "d32e7833-36b1-4e0f-bca2-59e01eaa5be4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all();return items.map(item=>{const body=item.json.body??item.json;if(typeof body.sample_id!==\"string\"||!body.sample_id.trim())throw new Error(\"Invalid sample_id\");if(typeof body.code!==\"string\"||!body.code.trim())throw new Error(\"Invalid code\");if(body.code.length>200000)throw new Error(\"Code too long\");return {json:{sample_id:body.sample_id,code:body.code,tests:body.tests??\"\"}};});"
+      },
+      "id": "095fa0be-c49d-4cf7-bdb2-7d2c11213e59",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst code = data.code ?? data.body?.code ?? '';\nconst findings = [];\nconst lines = code.split('\\n');\nfunction add(rule,severity,line,title,recommendation){findings.push({agent:'Bug Analysis',rule,severity,line,title,recommendation});}\nlines.forEach((s,i)=>{\n const n=i+1;\n if (/^\\s*def\\s+\\w+\\([^)]*=\\s*(\\[\\]|\\{\\}|set\\(\\))/.test(s)) add('BUG-MUTABLE-DEFAULT','HIGH',n,'Mutable default argument','Use None and create a new collection inside the function.');\n if (/\\breturn\\s+\\w+\\s*\\/\\s*\\w+/.test(s)) add('BUG-DIVZERO','MEDIUM',n,'Potential division by zero','Validate the divisor and test zero-count behavior.');\n if (/^\\s*except\\s*:/.test(s)) add('BUG-BARE-EXCEPT','MEDIUM',n,'Bare except clause','Catch specific exceptions and preserve error details.');\n if (/\\bconn\\s*=\\s*sqlite3\\.connect\\(/.test(s) && !/with\\s+/.test(s)) add('BUG-CONNECTION','LOW',n,'Database connection lifecycle','Close database connections reliably using try/finally or a suitable context manager.');\n});\nreturn [{json:{sample_id:data.sample_id,bug_findings:findings}}];\n"
+      },
+      "id": "14e462bc-e289-43af-a1e5-aee5406c6669",
+      "name": "Agent 1 — Bugs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst code = data.code ?? data.body?.code ?? '';\nconst findings=[];\nconst lines=code.split('\\n');\nfunction add(rule,severity,line,title,recommendation){findings.push({agent:'Security Analysis',rule,severity,line,title,recommendation});}\nlines.forEach((s,i)=>{\n const n=i+1;\n if (/\\b(query|sql)\\s*=\\s*.*\\b(SELECT|UPDATE|INSERT|DELETE)\\b.*(?:\\+|\\.format\\s*\\(|%\\s*\\(|f[\"'])/i.test(s) || /\\bexecute(?:many)?\\s*\\(\\s*(?:f[\"']|[^\\n]*\\+)/.test(s)) add('SEC-SQL-INJECTION','CRITICAL',n,'Potential SQL injection','Use parameterized queries and bind untrusted values as parameters.');\n if (/\\bshell\\s*=\\s*True\\b|\\bos\\.system\\s*\\(/.test(s)) add('SEC-SHELL','HIGH',n,'Shell command execution','Use subprocess argument arrays with shell=False and validate inputs.');\n if (/\\bpickle\\.(?:loads|load)\\s*\\(/.test(s)) add('SEC-PICKLE','HIGH',n,'Unsafe deserialization risk','Do not unpickle untrusted data; use a constrained data format such as JSON.');\n if (/\\b(?:eval|exec)\\s*\\(/.test(s)) add('SEC-EVAL','CRITICAL',n,'Dynamic evaluation of input','Remove eval/exec and explicitly parse expected data types.');\n if (/\\b(?:password|api_key|secret|token)\\s*=\\s*[\"'][^\"']{6,}[\"']/.test(s) && !/example|placeholder|dummy/i.test(s)) add('SEC-HARDCODED-SECRET','HIGH',n,'Possible hardcoded credential','Use a secrets manager or environment variables.');\n});\nreturn [{json:{sample_id:data.sample_id,agent:'security',findings}}];\n"
+      },
+      "id": "94618db4-6302-46ef-9ffe-5d9fad5edce4",
+      "name": "Agent 2 — Security",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data=$input.first().json;\nconst code=data.code ?? data.body?.code ?? '';\nconst tests=String(data.tests ?? '');\nconst findings=[];\nfunction add(rule,title,recommendation){findings.push({agent:'Test Coverage',rule,severity:'MEDIUM',title,recommendation});}\nif(!tests.trim()) add('TEST-NONE','No tests provided','Add unit tests for normal, error, and boundary cases.');\nif(/\\b(?:discounts|items)\\s*=\\s*\\[\\]/.test(code)) add('TEST-MUTABLE','Missing mutable-default regression test','Test repeated calls and isolation of mutable state.');\nif(/\\breturn\\s+\\w+\\s*\\/\\s*\\w+/.test(code)) add('TEST-ZERO','Missing zero-divisor test','Test division with zero as divisor.');\nif(/\\b(?:SELECT|execute\\s*\\()/.test(code)) add('TEST-SQL','Missing SQL input safety test','Test unusual and untrusted query parameters with a temporary database.');\nif(/\\bshell\\s*=\\s*True\\b|\\bpickle\\.loads\\s*\\(|\\beval\\s*\\(/.test(code)) add('TEST-SECURITY','Missing dangerous-input regression tests','Test rejection of untrusted commands, serialized data, and expressions without executing unsafe payloads.');\nreturn [{json:{sample_id:data.sample_id,test_findings:findings}}];\n"
+      },
+      "id": "b2e1e579-ffb2-4c8d-b91e-c06e9d6f2c3c",
+      "name": "Agent 3 — Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "e3b05b49-617f-4c6b-b664-47bd08f3c306",
+      "name": "Merge Agent Findings",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all();\nconst findings=[];\nfor(const item of items){for(const key of ['bug_findings','security_findings','test_findings','findings']){if(Array.isArray(item.json[key])) findings.push(...item.json[key]);}}\nconst rank={CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1};\nconst unique=new Map();\nfor(const f of findings){const severity=String(f.severity??'LOW').toUpperCase();const normalized={...f,severity};const id=f.rule ? `${f.rule}|${f.line??''}` : `${f.agent??''}|${f.title??f.issue??''}|${f.line??''}`;if(!unique.has(id))unique.set(id,normalized);}\nconst prioritized=[...unique.values()].sort((a,b)=>(rank[b.severity]??0)-(rank[a.severity]??0));\nconst summary={critical:0,high:0,medium:0,low:0,total:prioritized.length};\nfor(const f of prioritized){const k=f.severity.toLowerCase();if(k in summary && k!=='total')summary[k]++;}\nreturn [{json:{sample_id:items.find(i=>i.json.sample_id)?.json.sample_id??'unknown',status:summary.critical||summary.high?'CHANGES_REQUIRED':'REVIEW_COMPLETE',summary,findings:prioritized,debug:{received_items:items.length,findings_collected:findings.length,findings_after_deduplication:prioritized.length}}}];\n"
+      },
+      "id": "2692d2d6-6ec9-49a1-9ddf-9fe11db8c202",
+      "name": "Orchestrator — Prioritize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "9ca7eff8-10af-4988-92ff-085c1cc4b070",
+      "name": "Return Review JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1280,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Agent 1 — Bugs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent 2 — Security",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent 3 — Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 1 — Bugs": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 — Security": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Agent 3 — Tests": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Findings",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Agent Findings": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator — Prioritize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator — Prioritize": {
+      "main": [
+        [
+          {
+            "node": "Return Review JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3aa14d0e-f3b1-4a0e-9df6-fe9d113daec8",
+  "meta": {
+    "instanceId": "c345804b86439643673c8c90247a204a8b9bef33a99441617b228212d1586aff"
+  },
+  "nodeGroups": [],
+  "id": "Wsc2lXjOvM7jF315",
+  "tags": []
+}
